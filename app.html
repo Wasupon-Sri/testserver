@@ -97,7 +97,7 @@
                     <span id="roleBadge" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resident View</span>
                 </div>
                 
-                <!-- CHIEF WARD SELECTOR -->
+                <!-- CHIEF WARD SELECTOR (Replaces Change Ward Button for Chief) -->
                 <div id="chiefSourceSelector" class="hidden ml-2 animate-fade-in">
                     <div class="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1 shadow-sm">
                         <i class="fa-solid fa-hospital text-orange-500 text-xs"></i>
@@ -114,7 +114,10 @@
                      <button onclick="switchView('handoff')" id="viewBtnHandoff" class="px-3 py-1.5 rounded-md hover:bg-white/50 transition">Sign-Out</button>
                      <button onclick="switchView('discharged')" id="viewBtnDischarged" class="px-3 py-1.5 rounded-md hover:bg-white/50 text-slate-400 hover:text-rose-500 transition">Discharged</button>
                  </div>
-                 <button onclick="changeWard()" class="bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2 hover:bg-slate-50"><i class="fa-solid fa-right-left"></i> <span class="hidden sm:inline">Change Ward</span></button>
+                 
+                 <!-- Change Ward Button (Visible ONLY to Residents) -->
+                 <button onclick="changeWard()" id="btnChangeWard" class="bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2 hover:bg-slate-50"><i class="fa-solid fa-right-left"></i> <span class="hidden sm:inline">Change Ward</span></button>
+                 
                  <button onclick="toggleSelectMode()" id="btnSelectMode" class="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center hover:text-medical-600 shadow-sm" title="Select Multiple"><i class="fa-regular fa-square-check"></i></button>
                  <button onclick="openSettings()" class="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center hover:text-medical-600 shadow-sm"><i class="fa-solid fa-gear"></i></button>
                  <button onclick="manualRefresh()" id="btnRefresh" class="w-10 h-10 rounded-lg bg-slate-800 text-white flex items-center justify-center shadow-md hover:bg-slate-700"><i class="fa-solid fa-rotate"></i></button>
@@ -166,6 +169,27 @@
             <div id="viewDischarged" class="hidden pb-20"><h3 class="text-lg font-bold text-slate-600 mb-4 flex items-center gap-2"><i class="fa-solid fa-box-archive"></i> Archived Patients</h3><div id="dischargedList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div></div>
         </main>
         <button onclick="openEditor(null)" class="fixed bottom-6 right-6 w-14 h-14 bg-slate-800 text-white rounded-full shadow-2xl flex items-center justify-center z-30 hover:scale-105 transition hover:bg-medical-600"><i class="fa-solid fa-plus text-xl"></i></button>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settingsModal" class="fixed inset-0 z-[70] hidden flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-96 p-6 shadow-2xl animate-fade-in relative">
+            <button onclick="toggleElement('settingsModal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><i class="fa-solid fa-user-gear"></i> Profile Settings</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">New Password</label>
+                    <input type="password" id="setNewPwd" placeholder="Leave empty to keep current" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-medical-500">
+                </div>
+                <div id="usernameChangeSection">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Username (Database Name)</label>
+                    <input type="text" id="setNewName" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-medical-500 font-bold">
+                    <p class="text-[10px] text-orange-500 mt-1"><i class="fa-solid fa-circle-exclamation"></i> Changing this will rename your database.</p>
+                </div>
+                <button onclick="updateProfile()" id="btnUpdateProfile" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-4 shadow-lg hover:bg-slate-700">Update Profile</button>
+            </div>
+        </div>
     </div>
 
     <div id="editorModal" class="fixed inset-0 z-50 hidden">
@@ -260,6 +284,8 @@
                 document.getElementById('roleBadge').className = "text-[10px] font-bold text-orange-500 uppercase tracking-wider";
                 document.getElementById('viewBtnHandoff').style.display = 'none'; 
                 document.getElementById('chiefSourceSelector').classList.remove('hidden');
+                // HIDE Change Ward Button for Chief (Unified Interface)
+                document.getElementById('btnChangeWard').classList.add('hidden');
             }
             const savedGrid = localStorage.getItem('ward_grid_cols'); if(savedGrid) gridCols = parseInt(savedGrid);
             const savedBeds = localStorage.getItem('ward_total_beds'); if(savedBeds) { totalBeds = parseInt(savedBeds); document.getElementById('bedCountSlider').value = totalBeds; document.getElementById('bedCountLabel').innerText = totalBeds; }
@@ -527,6 +553,50 @@
             });
         }
 
+        // --- SETTINGS & PROFILE (NEW) ---
+        function openSettings() {
+            document.getElementById('setNewName').value = DB_NAME;
+            document.getElementById('setNewPwd').value = "";
+            toggleElement('settingsModal', true);
+            // Chiefs cannot rename themselves easily without breaking links for everyone else, so maybe hide renaming for Chiefs or warn heavily
+            if (ROLE === 'chief') {
+               document.getElementById('usernameChangeSection').classList.add('opacity-50', 'pointer-events-none');
+            }
+        }
+        
+        async function updateProfile() {
+            const newPwd = document.getElementById('setNewPwd').value;
+            const newName = document.getElementById('setNewName').value.trim();
+            
+            if(!newName) return alert("Username cannot be empty");
+            if(newName !== DB_NAME && !confirm("WARNING: Changing your username will rename your database. You will need to use the NEW name to login next time. Continue?")) return;
+            
+            const btn = document.getElementById('btnUpdateProfile');
+            btn.innerText = "Updating..."; btn.disabled = true;
+
+            try {
+                const res = await fetch(API_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify({
+                        action: 'auth_update_profile', 
+                        db: DB_NAME, 
+                        password: PASSWORD,
+                        newPassword: newPwd,
+                        newDbName: newName
+                    }) 
+                });
+                const json = await res.json();
+                
+                if (json.status === 'success' || json.status === 'renamed') {
+                    alert("Profile Updated. Please login again.");
+                    window.location.href = "index.html"; // Return to portal
+                } else {
+                    alert(json.error || "Update Failed");
+                }
+            } catch(e) { alert("Network Error"); }
+            finally { btn.innerText = "Update Profile"; btn.disabled = false; }
+        }
+
         function toggleSelectMode() { 
             isSelectMode = !isSelectMode; if(!isSelectMode) selectedIds.clear(); 
             document.getElementById('selectionToolbar').classList.toggle('hidden', !isSelectMode); 
@@ -563,11 +633,9 @@
                 const r = records.find(x => x.id === id); originalOwner = r.owner;
                 if(ROLE === 'chief') { 
                     const resSel = document.getElementById('residentSelect'); document.getElementById('residentSelectorDiv').classList.remove('hidden'); 
-                    // Add current owner to options if needed
                     let opts = availableResidents.map(r => `<option value="${r}">${r}</option>`);
-                    if(originalOwner && !availableResidents.includes(originalOwner)) opts.unshift(`<option value="${originalOwner}">${originalOwner}</option>`);
-                    resSel.innerHTML = opts.join('');
-                    resSel.value = originalOwner;
+                    if (originalOwner && !availableResidents.includes(originalOwner)) opts.unshift(`<option value="${originalOwner}">${originalOwner}</option>`);
+                    resSel.innerHTML = opts.join(''); resSel.value = originalOwner;
                 }
                 document.getElementById('editorTitle').innerText = "Edit Patient"; document.getElementById('editBed').value = r.bed_number; document.getElementById('editorBedBadge').innerText = `#${r.bed_number}`;
                 document.getElementById('editHN').value = r.hn; document.getElementById('editName').value = r.name; setDetails(r.details);
@@ -637,18 +705,23 @@
             
             let name = targetName; if(!name) { const count = records.length + 1; name = `Patient_${String(count).padStart(3, '0')}`; }
             
+            // Current State from Editor
+            const currentRecord = records.find(r => r.id === editingId);
+            const clientLastUpdated = currentRecord ? currentRecord.updated_at : null;
+
             const p = { 
                 id: editingId || 'rec_' + Date.now(), 
                 bed_number: targetBed, hn: document.getElementById('editHN').value, name: name, ward: currentWard, 
                 details: detailsVal, consult_units: JSON.stringify(activeConsults), 
                 color_id: document.getElementById('colorContainer').dataset.selected || '#ffffff', 
                 todo_list: JSON.stringify(validTodos), is_discharged: currentDischarged,
-                last_updated_client: records.find(r => r.id === editingId)?.updated_at || null 
+                last_updated_client: clientLastUpdated // Protocol C: Send timestamp
             };
 
             let targetDB = DB_NAME;
             if (ROLE === 'chief') { 
-                targetDB = document.getElementById('residentSelect').value; 
+                // Ensure we save to the currently selected Chief View DB or the Resident selector in modal
+                targetDB = document.getElementById('residentSelect').value || chiefSelectedWard; 
                 if(!targetDB) { alert("Please select a resident."); return; } 
             }
             
@@ -665,12 +738,15 @@
             const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(payload) });
             const json = await res.json();
 
+            // --- PROTOCOL C: HANDLING CONFLICTS ---
             if (json.status === 'conflict') {
-                if(confirm(`DATA CONFLICT!\n\nServer has newer data.\nOverwrite?`)) {
+                if(confirm(`DATA CONFLICT!\n\nThe server has newer data for this patient.\nYour changes: ${p.details.substring(0,20)}...\nServer data: ${json.serverData.details.substring(0,20)}...\n\nClick OK to OVERWRITE server (force save).\nClick Cancel to DISCARD your changes and reload.`)) {
+                     // Force Save
                      payload.force = true;
                      await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
                      showToast("Forced Update Success", true);
                 } else {
+                    // Discard and Reload
                     fetchData();
                     alert("Reloaded latest data.");
                 }
