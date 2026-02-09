@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ward Manager Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'], mono: ['Inter', 'monospace'] },
+                    colors: {
+                        brand: { 500: '#3b82f6', 600: '#2563eb', 900: '#0f172a' },
+                        surface: { 800: '#1e293b', 900: '#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: radial-gradient(circle at top right, #1e293b, #0f172a); color: white; min-height: 100vh; }
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .role-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .user-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); border-color: #3b82f6; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .role-radio:checked + div { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+        .role-radio:disabled + div { background-color: #334155; color: #64748b; border-color: #334155; opacity: 0.5; cursor: not-allowed; }
+        
+        /* Admin Elements */
+        .admin-element { display: none !important; }
+        .admin-mode .admin-element { display: flex !important; }
+    </style>
+</head>
+<body class="flex flex-col antialiased">
+
+    <div class="container mx-auto p-6 max-w-5xl flex-1 flex flex-col">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-12 pt-6">
+            <div class="flex items-center gap-4 mb-6 md:mb-0">
+                <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-blue-500/20"><i class="fa-solid fa-staff-snake"></i></div>
+                <div><h1 class="text-3xl font-bold tracking-tight">Ward Manager</h1><p class="text-slate-400 text-sm font-medium tracking-wide">Internal Medicine • Rajavithi</p></div>
+            </div>
+            
+            <div class="flex gap-3">
+                <div class="glass-panel p-1.5 rounded-xl flex gap-1">
+                    <button onclick="setRole('all')" id="roleAll" class="role-btn active px-6 py-2.5 rounded-lg text-sm font-bold text-slate-400 transition-all duration-300 flex items-center gap-2"><i class="fa-solid fa-users"></i> All</button>
+                    <button onclick="setRole('resident')" id="roleResident" class="role-btn px-6 py-2.5 rounded-lg text-sm font-bold text-slate-400 transition-all duration-300 flex items-center gap-2"><i class="fa-solid fa-user-doctor"></i> Residents</button>
+                    <button onclick="setRole('chief')" id="roleChief" class="role-btn px-6 py-2.5 rounded-lg text-sm font-bold text-slate-400 transition-all duration-300 flex items-center gap-2"><i class="fa-solid fa-user-tie"></i> Chiefs</button>
+                </div>
+                
+                <button onclick="toggleAdminMode()" id="btnAdminToggle" class="glass-panel w-12 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition border border-white/5"><i class="fa-solid fa-lock"></i></button>
+            </div>
+        </header>
+
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-slate-200" id="gridTitle">All Databases</h2>
+            <button onclick="toggleCreate()" class="glass-panel hover:bg-white/5 px-4 py-3 rounded-xl transition text-sm font-bold flex items-center gap-2 border border-white/10 text-blue-400"><i class="fa-solid fa-plus"></i> New User</button>
+        </div>
+
+        <!-- NEW USER CREATION PANEL -->
+        <div id="createPanel" class="hidden glass-panel p-6 rounded-2xl mb-8 animate-fade-in border-l-4 border-blue-500">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="font-bold text-lg text-white">Initialize New Ward Database</h3>
+                <div id="createAuthBadge" class="px-3 py-1 rounded bg-slate-800 text-xs font-bold text-slate-400 border border-slate-700"></div>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="flex flex-col md:flex-row gap-4">
+                    <input type="text" id="newDbName" placeholder="New Username (e.g. Res_Somsak)" class="flex-1 bg-slate-900/50 border border-slate-600 rounded-xl p-3.5 outline-none focus:border-blue-500 text-white transition placeholder:text-slate-500">
+                    
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <label class="cursor-pointer flex-1">
+                            <input type="radio" name="newRole" value="resident" class="role-radio hidden" checked>
+                            <div class="border border-slate-600 rounded-xl p-3.5 px-6 text-center text-sm font-bold text-slate-400 transition hover:bg-slate-800 flex items-center justify-center whitespace-nowrap">
+                                <i class="fa-solid fa-user-doctor mr-2 text-blue-400"></i> Resident
+                            </div>
+                        </label>
+                        <label class="cursor-pointer flex-1">
+                            <input type="radio" name="newRole" value="chief" id="radioChief" class="role-radio hidden">
+                            <div class="border border-slate-600 rounded-xl p-3.5 px-6 text-center text-sm font-bold text-slate-400 transition hover:bg-slate-800 flex items-center justify-center whitespace-nowrap">
+                                <i class="fa-solid fa-user-tie mr-2 text-orange-400"></i> Chief
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center mt-2">
+                    <p class="text-xs text-slate-500">Note: User will set their password upon first login.</p>
+                    <button onclick="createDB()" class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-blue-600/20 transition transform active:scale-[0.98] flex items-center gap-2">Create Account <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="loader" class="text-center py-32"><i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500"></i></div>
+        <div id="dbGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden pb-10"></div>
+    </div>
+
+    <footer class="text-center py-6 text-slate-600 text-xs">System v5.0 • Developed for Rajavithi Hospital</footer>
+
+    <!-- ADMIN LOGIN MODAL -->
+    <div id="adminModal" class="fixed inset-0 bg-slate-950/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-700 shadow-2xl w-96 relative">
+            <button onclick="closeAdminAuth()" class="absolute top-4 right-4 text-slate-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-xl text-white border border-slate-600"><i class="fa-solid fa-user-shield"></i></div>
+                <h3 class="text-white font-bold text-lg">Account Management</h3>
+                <p class="text-slate-400 text-xs">Login to Manage Accounts</p>
+            </div>
+            <div class="flex bg-slate-800 p-1 rounded-lg mb-6">
+                <button onclick="switchAuthTab('master')" id="tabMaster" class="flex-1 py-2 text-xs font-bold rounded-md bg-blue-600 text-white transition">Master Key</button>
+                <button onclick="switchAuthTab('chief')" id="tabChief" class="flex-1 py-2 text-xs font-bold rounded-md text-slate-400 hover:text-white transition">Chief Login</button>
+            </div>
+            <div id="authMaster" class="space-y-4">
+                <p class="text-xs text-slate-500 text-center mb-2">Full access to manage Chiefs & Residents</p>
+                <input type="password" id="inputMasterKey" class="w-full bg-slate-950 border border-slate-600 rounded-xl px-4 py-3 text-center text-white focus:border-blue-500 outline-none transition tracking-widest" placeholder="Enter Master Key">
+            </div>
+            <div id="authChief" class="space-y-3 hidden">
+                <p class="text-xs text-slate-500 text-center mb-2">Limited access to manage Residents only</p>
+                <input type="text" id="inputChiefUser" class="w-full bg-slate-950 border border-slate-600 rounded-xl px-4 py-3 text-sm text-white focus:border-orange-500 outline-none transition" placeholder="Chief Username">
+                <input type="password" id="inputChiefPass" class="w-full bg-slate-950 border border-slate-600 rounded-xl px-4 py-3 text-sm text-white focus:border-orange-500 outline-none transition" placeholder="Chief Password">
+            </div>
+            <button onclick="checkAdmin()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold transition shadow-lg mt-6">Unlock Mode</button>
+        </div>
+    </div>
+
+    <!-- DELETE AUTH MODAL -->
+    <div id="deleteModal" class="fixed inset-0 bg-slate-950/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-slate-900 p-8 rounded-2xl border border-slate-700 shadow-2xl w-96 relative">
+            <button onclick="document.getElementById('deleteModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 text-xl border border-rose-500/50"><i class="fa-solid fa-trash-can"></i></div>
+                <h3 class="text-white font-bold text-lg">Confirm Deletion</h3>
+                <p class="text-slate-400 text-xs mt-1">Target: <span id="delTargetName" class="text-white font-mono"></span></p>
+            </div>
+            <div class="space-y-3">
+                <input type="password" id="delMasterKey" class="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-3 text-center text-white focus:border-blue-500 outline-none transition" placeholder="Master Key">
+            </div>
+            <div id="delChiefSection" class="hidden mt-4 pt-4 border-t border-slate-700">
+                <p class="text-center text-slate-500 text-xs font-bold uppercase mb-3">- OR USE CHIEF ACCOUNT -</p>
+                <input type="text" id="delChiefUser" class="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 mb-2 text-sm text-white focus:border-orange-500 outline-none" placeholder="Chief Username">
+                <input type="password" id="delChiefPwd" class="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-orange-500 outline-none" placeholder="Chief Password">
+            </div>
+            <button onclick="submitDelete()" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-bold transition shadow-lg mt-6">Confirm Delete</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbxZrOuiFqLzmaX9T7PN7xqwV-jvE80dBuNk4Gc3nV1K8-ZZw0YUEYDupPg_RKc1JUFB/exec";
+        const APP_URL = "https://wasupon-sri.github.io/wardmatrix/app.html"; 
+        
+        let currentRole = 'all'; 
+        let allUsers = [];
+        let isEditMode = false;
+        let adminSession = null;
+        let pendingDeleteTarget = null;
+        let pendingDeleteRole = null;
+
+        window.onload = loadDatabases;
+
+        function setRole(role) {
+            currentRole = role;
+            document.getElementById('roleAll').classList.toggle('active', role === 'all');
+            document.getElementById('roleResident').classList.toggle('active', role === 'resident');
+            document.getElementById('roleChief').classList.toggle('active', role === 'chief');
+            document.getElementById('gridTitle').innerText = role === 'all' ? "All Databases" : (role === 'chief' ? "Chief Accounts" : "Resident Accounts");
+            renderGrid();
+        }
+
+        function toggleCreate() {
+            if(!adminSession) {
+                alert("Please unlock Admin Mode first (Lock Icon)");
+                toggleAdminMode();
+                return;
+            }
+            const el = document.getElementById('createPanel'); el.classList.toggle('hidden');
+            if(!el.classList.contains('hidden')) { document.getElementById('newDbName').focus(); }
+        }
+
+        function toggleAdminMode() {
+            if (adminSession) {
+                adminSession = null;
+                isEditMode = false;
+                document.body.classList.remove('admin-mode');
+                document.getElementById('btnAdminToggle').innerHTML = '<i class="fa-solid fa-lock"></i>';
+                document.getElementById('btnAdminToggle').className = "glass-panel w-12 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition border border-white/5";
+                document.getElementById('createPanel').classList.add('hidden');
+                renderGrid();
+            } else {
+                document.getElementById('adminModal').classList.remove('hidden');
+                document.getElementById('adminModal').classList.add('flex');
+            }
+        }
+
+        function closeAdminAuth() {
+            document.getElementById('adminModal').classList.add('hidden');
+            document.getElementById('adminModal').classList.remove('flex');
+        }
+
+        function switchAuthTab(type) {
+            const tabM = document.getElementById('tabMaster');
+            const tabC = document.getElementById('tabChief');
+            const areaM = document.getElementById('authMaster');
+            const areaC = document.getElementById('authChief');
+
+            if(type === 'master') {
+                tabM.className = "flex-1 py-2 text-xs font-bold rounded-md bg-blue-600 text-white transition";
+                tabC.className = "flex-1 py-2 text-xs font-bold rounded-md text-slate-400 hover:text-white transition";
+                areaM.classList.remove('hidden'); areaC.classList.add('hidden');
+            } else {
+                tabM.className = "flex-1 py-2 text-xs font-bold rounded-md text-slate-400 hover:text-white transition";
+                tabC.className = "flex-1 py-2 text-xs font-bold rounded-md bg-orange-600 text-white transition";
+                areaM.classList.add('hidden'); areaC.classList.remove('hidden');
+            }
+        }
+
+        async function checkAdmin() {
+            const isMaster = !document.getElementById('authMaster').classList.contains('hidden');
+            const btn = event.target;
+            btn.innerText = "Verifying...";
+
+            let payload = { action: 'auth_verify' };
+            let sessionData = {};
+
+            if (isMaster) {
+                const key = document.getElementById('inputMasterKey').value.trim();
+                payload.password = key;
+                sessionData = { type: 'master', key: key };
+            } else {
+                const user = document.getElementById('inputChiefUser').value.trim();
+                const pass = document.getElementById('inputChiefPass').value.trim();
+                if(!user || !pass) { alert("Please fill all fields"); btn.innerText = "Unlock Mode"; return; }
+                payload.db = user;
+                payload.password = pass;
+                sessionData = { type: 'chief', user: user, pass: pass };
+            }
+            
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+                const json = await res.json();
+                
+                if (json.status === 'success') {
+                    if (!isMaster && json.role !== 'chief') {
+                        alert("Access Denied: This account is not a Chief.");
+                        btn.innerText = "Unlock Mode";
+                        return;
+                    }
+
+                    adminSession = sessionData;
+                    isEditMode = true;
+                    document.body.classList.add('admin-mode');
+                    document.getElementById('adminModal').classList.add('hidden');
+                    document.getElementById('adminModal').classList.remove('flex');
+                    
+                    const toggleBtn = document.getElementById('btnAdminToggle');
+                    toggleBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i>';
+                    toggleBtn.className = "glass-panel w-12 rounded-xl flex items-center justify-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 transition shadow-glow";
+                    
+                    const badge = document.getElementById('createAuthBadge');
+                    if (isMaster) {
+                        badge.innerText = "MASTER ADMIN";
+                        badge.className = "px-3 py-1 rounded bg-blue-900/50 text-xs font-bold text-blue-400 border border-blue-500/30";
+                        document.getElementById('radioChief').disabled = false;
+                    } else {
+                        badge.innerText = `CHIEF: ${sessionData.user}`;
+                        badge.className = "px-3 py-1 rounded bg-orange-900/50 text-xs font-bold text-orange-400 border border-orange-500/30";
+                        document.getElementById('radioChief').disabled = true; 
+                    }
+                    renderGrid();
+                } else {
+                    alert("Invalid Credentials");
+                }
+            } catch(e) { alert("Verification Failed"); }
+            finally { 
+                btn.innerText = "Unlock Mode"; 
+                document.getElementById('inputMasterKey').value = "";
+                document.getElementById('inputChiefPass').value = "";
+            }
+        }
+
+        async function loadDatabases() {
+            try {
+                const res = await fetch(`${API_URL}?action=admin_list_users`);
+                const json = await res.json();
+                if(json.users) { allUsers = json.users; renderGrid(); }
+            } catch(e) { alert("Failed to load databases."); }
+        }
+
+        function renderGrid() {
+            document.getElementById('loader').classList.add('hidden'); const grid = document.getElementById('dbGrid'); grid.classList.remove('hidden');
+            
+            const filteredUsers = currentRole === 'all' ? allUsers : allUsers.filter(u => u.role === currentRole);
+            
+            if (filteredUsers.length === 0) { grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-500 italic">No databases found. Create one above.</div>`; return; }
+
+            grid.innerHTML = filteredUsers.map(u => {
+                const isChief = u.role === 'chief'; const initial = u.name.charAt(0).toUpperCase(); const icon = isChief ? 'fa-user-tie' : 'fa-user-doctor';
+                
+                let showDelete = false;
+                if (adminSession) {
+                    if (adminSession.type === 'master') showDelete = true;
+                    else if (adminSession.type === 'chief' && !isChief) showDelete = true;
+                }
+
+                const deleteBtn = showDelete ? 
+                    `<button onclick="confirmDelete('${u.name}'); event.stopPropagation();" class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center z-20 border border-rose-500/30 transition hover:scale-110">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>` : '';
+
+                return `<div onclick="enterApp('${u.name}', '${u.role}')" class="user-card cursor-pointer bg-surface-800/50 border border-slate-700/50 p-6 rounded-2xl transition group relative overflow-hidden backdrop-blur-sm">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition"><i class="fa-solid ${icon} text-6xl text-white"></i></div>
+                    ${deleteBtn}
+                    <div class="flex items-center gap-4 mb-4 relative z-10"><div class="w-12 h-12 rounded-full bg-slate-700/50 ${isChief?'text-orange-400':'text-blue-400'} flex items-center justify-center font-bold text-xl border border-slate-600 group-hover:bg-${isChief?'orange':'blue'}-500 group-hover:text-white transition shadow-inner">${initial}</div><div><h3 class="font-bold text-lg text-white truncate w-32 leading-tight">${u.name}</h3><p class="text-xs text-slate-400 transition uppercase font-bold tracking-wide">${u.role}</p></div></div>
+                    <div class="flex items-center justify-between mt-2 pt-4 border-t border-slate-700/50"><span class="text-xs font-mono text-slate-500">Access</span><i class="fa-solid fa-arrow-right text-slate-600 transition transform group-hover:translate-x-1"></i></div></div>`;
+            }).join('');
+            
+            if(isEditMode) document.body.classList.add('admin-mode');
+        }
+
+        function enterApp(dbName, role) { 
+            if(!isEditMode) {
+                window.location.href = `${APP_URL}?db=${encodeURIComponent(dbName)}&role=${role}`;
+            }
+        }
+
+        async function createDB() {
+            if(!adminSession) return;
+            const name = document.getElementById('newDbName').value.trim(); 
+            const role = document.querySelector('input[name="newRole"]:checked').value;
+            
+            if(!name) return alert("Please enter a username");
+            
+            let payload = { action: 'admin_create_user', dbName: name, newPassword: "", userRole: role };
+
+            if (adminSession.type === 'master') {
+                payload.adminKey = adminSession.key;
+            } else {
+                payload.creatorDB = adminSession.user;
+                payload.creatorPwd = adminSession.pass;
+            }
+
+            const btn = event.target; const originalText = btn.innerHTML; btn.innerHTML = "<i class='fa-solid fa-circle-notch fa-spin'></i> Creating..."; btn.disabled = true;
+            try {
+                const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(payload)});
+                const json = await res.json();
+                if(json.status === 'success') { 
+                    document.getElementById('newDbName').value = ""; 
+                    alert("Account Created! User can set password on first login.");
+                    toggleCreate(); loadDatabases(); 
+                } else { alert(json.error || "Creation failed"); }
+            } catch(e) { alert("Network error"); } finally { btn.innerHTML = originalText; btn.disabled = false; }
+        }
+
+        async function submitDelete() {
+            let payload = { action: 'admin_delete_user', dbName: pendingDeleteTarget };
+            
+            if (adminSession) {
+                if (adminSession.type === 'master') {
+                    payload.adminKey = adminSession.key;
+                } else {
+                    payload.creatorDB = adminSession.user;
+                    payload.creatorPwd = adminSession.pass;
+                }
+            } else {
+                const masterKey = document.getElementById('delMasterKey').value.trim();
+                const chiefUser = document.getElementById('delChiefUser').value.trim();
+                const chiefPwd = document.getElementById('delChiefPwd').value.trim();
+
+                if (masterKey) {
+                    payload.adminKey = masterKey;
+                } else if (chiefUser && chiefPwd) {
+                    payload.creatorDB = chiefUser;
+                    payload.creatorPwd = chiefPwd;
+                } else {
+                    alert("Please provide credentials.");
+                    return;
+                }
+            }
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "Processing..."; btn.disabled = true;
+
+            try {
+                const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(payload) });
+                const json = await res.json();
+                
+                if(json.status === 'success' || json.status === 'deleted') { 
+                    document.getElementById('deleteModal').classList.add('hidden');
+                    loadDatabases(); 
+                } else { 
+                    alert(json.error || "Delete failed"); 
+                }
+            } catch(e) { alert("Network Error"); }
+            finally {
+                btn.innerText = originalText; btn.disabled = false;
+            }
+        }
+
+        async function confirmDelete(targetName) {
+            if(!adminSession) return;
+            if(!confirm(`PERMANENTLY DELETE "${targetName}"?\nThis action cannot be undone.`)) return;
+
+            const payload = { action: 'admin_delete_user', dbName: targetName };
+            
+            if (adminSession.type === 'master') {
+                payload.adminKey = adminSession.key;
+            } else {
+                payload.creatorDB = adminSession.user;
+                payload.creatorPwd = adminSession.pass;
+            }
+
+            try {
+                const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(payload) });
+                const json = await res.json();
+                
+                if(json.status === 'success' || json.status === 'deleted') { 
+                    loadDatabases(); 
+                } else { 
+                    alert(json.error || "Delete failed"); 
+                }
+            } catch(e) { alert("Network Error"); }
+        }
+    </script>
+</body>
+</html>
