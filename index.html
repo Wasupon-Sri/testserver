@@ -30,6 +30,16 @@
         .role-radio:checked + div { background-color: #3b82f6; color: white; border-color: #3b82f6; }
         .role-radio:disabled + div { background-color: #334155; color: #64748b; border-color: #334155; opacity: 0.5; cursor: not-allowed; }
         
+        /* FORCE SPIN ANIMATION */
+        @keyframes spin-forced { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spin-active { animation: spin-forced 1s linear infinite; }
+        
+        /* FIX: White Cursor for Dark Portal Background */
+        input, textarea, [contenteditable="true"] {
+            caret-color: white !important;
+            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' stroke='white' stroke-width='3' stroke-linecap='round'><path d='M16 4v24M11 4h10M11 28h10'/></svg>") 16 16, text !important;
+        }
+
         /* Admin Elements */
         .admin-element { display: none !important; }
         .admin-mode .admin-element { display: flex !important; }
@@ -94,11 +104,11 @@
             </div>
         </div>
 
-        <div id="loader" class="text-center py-32"><i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500"></i></div>
+        <div id="loader" class="text-center py-32"><i class="fa-solid fa-circle-notch spin-active text-4xl text-blue-500"></i></div>
         <div id="dbGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden pb-10"></div>
     </div>
 
-    <footer class="text-center py-6 text-slate-600 text-xs">System v5.0 • Developed for Rajavithi Hospital</footer>
+    <footer class="text-center py-6 text-slate-600 text-xs">System v5.1 • Developed for Rajavithi Hospital</footer>
 
     <!-- ADMIN LOGIN MODAL -->
     <div id="adminModal" class="fixed inset-0 bg-slate-950/90 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
@@ -341,7 +351,7 @@
                 payload.creatorPwd = adminSession.pass;
             }
 
-            const btn = event.target; const originalText = btn.innerHTML; btn.innerHTML = "<i class='fa-solid fa-circle-notch fa-spin'></i> Creating..."; btn.disabled = true;
+            const btn = event.target; const originalText = btn.innerHTML; btn.innerHTML = "<i class='fa-solid fa-circle-notch spin-active'></i> Creating..."; btn.disabled = true;
             try {
                 const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(payload)});
                 const json = await res.json();
