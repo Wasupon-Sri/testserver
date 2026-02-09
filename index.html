@@ -30,7 +30,6 @@
         .role-radio:checked + div { background-color: #3b82f6; color: white; border-color: #3b82f6; }
         .role-radio:disabled + div { background-color: #334155; color: #64748b; border-color: #334155; opacity: 0.5; cursor: not-allowed; }
         
-        /* FORCE SPIN ANIMATION */
         @keyframes spin-forced { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .spin-active { animation: spin-forced 1s linear infinite; }
         
@@ -40,7 +39,6 @@
             cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' stroke='white' stroke-width='3' stroke-linecap='round'><path d='M16 4v24M11 4h10M11 28h10'/></svg>") 16 16, text !important;
         }
 
-        /* Admin Elements */
         .admin-element { display: none !important; }
         .admin-mode .admin-element { display: flex !important; }
     </style>
@@ -159,7 +157,7 @@
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbxZrOuiFqLzmaX9T7PN7xqwV-jvE80dBuNk4Gc3nV1K8-ZZw0YUEYDupPg_RKc1JUFB/exec";
-        const APP_URL = "https://wasupon-sri.github.io/wardmatrix/app.html"; 
+        const APP_URL = "https://wasupon-sri.github.io/testserver/app.html"; 
         
         let currentRole = 'all'; 
         let allUsers = [];
