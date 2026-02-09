@@ -41,7 +41,7 @@
         .grid-1 { grid-template-columns: repeat(1, 1fr); } .grid-2 { grid-template-columns: repeat(2, 1fr); } .grid-3 { grid-template-columns: repeat(3, 1fr); } .grid-4 { grid-template-columns: repeat(4, 1fr); } .grid-5 { grid-template-columns: repeat(5, 1fr); } .grid-6 { grid-template-columns: repeat(6, 1fr); }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e2e8f0; border-radius: 20px; }
         
-        /* FIX: Black Cursor for Light App Background (High Contrast) */
+        /* FIX: High Contrast Black Cursor for App */
         input, textarea, [contenteditable="true"] {
             caret-color: black !important;
             cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' stroke='black' stroke-width='3' stroke-linecap='round'><path d='M16 4v24M11 4h10M11 28h10'/></svg>") 16 16, text !important;
@@ -97,12 +97,12 @@
                     <span id="roleBadge" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resident View</span>
                 </div>
                 
-                <!-- NEW: CHIEF SOURCE SELECTOR -->
-                <div id="chiefSourceSelector" class="hidden ml-2">
-                    <div class="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1">
-                        <i class="fa-solid fa-database text-orange-500 text-xs"></i>
-                        <select id="dbSelector" onchange="switchDatabase(this.value)" class="bg-transparent text-xs font-bold text-orange-700 outline-none cursor-pointer min-w-[120px]">
-                            <option value="">Select Source...</option>
+                <!-- CHIEF WARD SELECTOR -->
+                <div id="chiefSourceSelector" class="hidden ml-2 animate-fade-in">
+                    <div class="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1 shadow-sm">
+                        <i class="fa-solid fa-hospital text-orange-500 text-xs"></i>
+                        <select id="wardSelector" onchange="switchWardContext(this.value)" class="bg-transparent text-xs font-bold text-orange-700 outline-none cursor-pointer min-w-[120px]">
+                            <option value="">Loading Wards...</option>
                         </select>
                     </div>
                 </div>
@@ -147,9 +147,9 @@
         <main class="flex-1 overflow-y-auto p-4 md:p-6 relative" id="mainScroll">
             <!-- EMPTY STATE FOR CHIEF -->
             <div id="chiefEmptyState" class="hidden h-full flex flex-col items-center justify-center text-slate-400 pb-20">
-                <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><i class="fa-solid fa-arrow-up text-2xl text-slate-300"></i></div>
-                <p class="font-bold">Select a Ward Source above</p>
-                <p class="text-xs mt-1">To view patient data, select a resident database.</p>
+                <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><i class="fa-solid fa-hospital-user text-2xl text-slate-300"></i></div>
+                <p class="font-bold text-slate-500">Select a Ward to Round</p>
+                <p class="text-xs mt-1">Data from all residents will be aggregated here.</p>
             </div>
 
             <div id="viewGrid" class="block"><div id="bedGrid" class="grid gap-3 pb-20 transition-all duration-300"></div></div>
@@ -250,17 +250,16 @@
         let autoSaveTimer = null; let refreshTimer = null;
         let toastTimer = null; 
         
-        // NEW: Chief State
-        let chiefSelectedDB = ""; 
+        let chiefSelectedWard = ""; // Track currently viewed ward for Chiefs
 
         window.onload = () => {
             if(!DB_NAME) return document.body.innerHTML = "<div class='p-10 text-center font-bold'>Error: No Database Selected</div>";
             document.getElementById('loginDbName').innerText = DB_NAME;
-            document.getElementById('roleBadge').innerText = ROLE === 'chief' ? "Ward Chief" : "Ward Resident";
+            document.getElementById('roleBadge').innerText = ROLE === 'chief' ? "Ward Chief (View)" : "Ward Resident";
             if(ROLE === 'chief') {
                 document.getElementById('roleBadge').className = "text-[10px] font-bold text-orange-500 uppercase tracking-wider";
-                document.getElementById('viewBtnHandoff').style.display = 'none'; // Hide Handoff for Chief
-                document.getElementById('chiefSourceSelector').classList.remove('hidden'); // Show Dropdown
+                document.getElementById('viewBtnHandoff').style.display = 'none'; 
+                document.getElementById('chiefSourceSelector').classList.remove('hidden');
             }
             const savedGrid = localStorage.getItem('ward_grid_cols'); if(savedGrid) gridCols = parseInt(savedGrid);
             const savedBeds = localStorage.getItem('ward_total_beds'); if(savedBeds) { totalBeds = parseInt(savedBeds); document.getElementById('bedCountSlider').value = totalBeds; document.getElementById('bedCountLabel').innerText = totalBeds; }
@@ -299,13 +298,14 @@
             autoSaveTimer = setInterval(() => { if(!document.getElementById('editorModal').classList.contains('hidden')) saveRecord(true); }, 30000);
         }
 
-        // NEW: Specific DB Switching for Chiefs
-        function switchDatabase(db) {
-            chiefSelectedDB = db;
-            records = []; // Clear current view
-            renderView(); // Clear grid
-            if(db) {
+        // NEW: Specific Ward Switching for Chiefs
+        function switchWardContext(ward) {
+            chiefSelectedWard = ward;
+            records = []; 
+            renderView(); 
+            if(ward) {
                 document.getElementById('chiefEmptyState').classList.add('hidden');
+                currentWard = ward; // Sync global ward
                 fetchData(); 
             } else {
                 document.getElementById('chiefEmptyState').classList.remove('hidden');
@@ -316,38 +316,47 @@
             if(!silent) document.getElementById('btnRefresh').classList.add('animate-spin', 'spin-active');
             
             try {
-                // --- TARGETED FETCH FOR CHIEF ---
+                // --- CHIEF MODE: Ward-Based Fetch ---
                 if (ROLE === 'chief') {
-                    // 1. Load User List (only once ideally, but cheap enough to reload)
-                    const listRes = await fetch(`${API_URL}?action=admin_list_users`);
-                    const listJson = await listRes.json();
+                    // 1. Initial Load: Get Ward List
+                    if (!chiefSelectedWard && document.getElementById('wardSelector').options.length <= 1) {
+                        const wardRes = await fetch(API_URL, { 
+                            method: 'POST', 
+                            headers: {"Content-Type": "text/plain;charset=utf-8"}, 
+                            body: JSON.stringify({ action: 'chief_get_ward_list', password: PASSWORD, requester: DB_NAME }) 
+                        });
+                        const wardJson = await wardRes.json();
+                        
+                        const sel = document.getElementById('wardSelector');
+                        sel.innerHTML = `<option value="">Select Ward...</option>` + 
+                            wardJson.wards.map(w => `<option value="${w}">${w}</option>`).join('');
+                        
+                        document.getElementById('chiefEmptyState').classList.remove('hidden');
+                    }
                     
-                    // Update Dropdown
-                    const sel = document.getElementById('dbSelector');
-                    const currentSel = sel.value;
-                    availableResidents = listJson.users.filter(u => u.role === 'resident').map(u => u.name);
-                    
-                    sel.innerHTML = `<option value="">Select Source...</option>` + 
-                        availableResidents.map(r => `<option value="${r}" ${r===chiefSelectedDB?'selected':''}>${r}</option>`).join('');
-                    
-                    if (chiefSelectedDB) {
-                        sel.value = chiefSelectedDB; // Preserve selection
-                        // 2. Fetch DATA only for selected DB
+                    // 2. Data Load: Fetch by Selected Ward
+                    if (chiefSelectedWard) {
                         const res = await fetch(API_URL, { 
                             method: 'POST', 
                             headers: {"Content-Type": "text/plain;charset=utf-8"}, 
-                            body: JSON.stringify({ action: 'read', db: chiefSelectedDB, password: PASSWORD, requester: DB_NAME }) 
+                            body: JSON.stringify({ 
+                                action: 'chief_get_data_by_ward', 
+                                target_ward: chiefSelectedWard,
+                                password: PASSWORD, 
+                                requester: DB_NAME 
+                            }) 
                         });
                         const json = await res.json();
-                        records = Array.isArray(json) ? json.map(rec => ({...processRecord(rec), owner: chiefSelectedDB})) : [];
+                        // Backend already adds 'owner' field
+                        records = Array.isArray(json) ? json.map(rec => processRecord(rec)) : [];
                         document.getElementById('chiefEmptyState').classList.add('hidden');
-                    } else {
-                        // No DB selected yet
-                        records = [];
-                        document.getElementById('chiefEmptyState').classList.remove('hidden');
+                        
+                        // Populate resident list for modal logic
+                        const uniqueOwners = new Set(records.map(r => r.owner).filter(o => o));
+                        availableResidents = Array.from(uniqueOwners);
                     }
                 } 
-                // --- NORMAL FETCH FOR RESIDENT ---
+                // --- RESIDENT MODE: Normal Fetch ---
                 else {
                     const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify({action: 'read', db: DB_NAME, password: PASSWORD}) });
                     const json = await res.json();
@@ -356,7 +365,10 @@
                 }
             } catch(e) { if(!silent) console.error("Fetch Error:", e); }
             
-            wards = new Set(["General Ward"]); records.forEach(r => { if(r.ward) wards.add(r.ward); });
+            if (ROLE !== 'chief') {
+                wards = new Set(["General Ward"]); records.forEach(r => { if(r.ward) wards.add(r.ward); });
+            }
+            
             renderView();
             if(!silent) document.getElementById('btnRefresh').classList.remove('animate-spin', 'spin-active');
         }
@@ -382,8 +394,8 @@
             renderView();
         }
         function renderView() { 
-            // Safety: If Chief has not selected a DB, don't render grid to avoid confusion
-            if(ROLE === 'chief' && !chiefSelectedDB) {
+            // Safety: If Chief has not selected a Ward, don't render grid
+            if(ROLE === 'chief' && !chiefSelectedWard) {
                 document.getElementById('bedGrid').innerHTML = "";
                 document.getElementById('matrixContainer').innerHTML = "";
                 return;
@@ -403,10 +415,14 @@
             const grid = document.getElementById('bedGrid');
             grid.className = `grid gap-3 pb-20 grid-${gridCols}`; grid.innerHTML = "";
             document.getElementById('headerWard').innerText = currentWard;
-            const activeRecords = records.filter(r => r.ward === currentWard && !r.is_discharged);
+            
+            // For Chief, we display all records fetched (which are already filtered by ward)
+            const activeRecords = records.filter(r => !r.is_discharged);
+            // If Resident, filter further by currentWard (local filtering)
+            const displayRecords = ROLE === 'chief' ? activeRecords : activeRecords.filter(r => r.ward === currentWard);
             
             for(let i=1; i<=totalBeds; i++) {
-                const occupants = activeRecords.filter(r => parseInt(r.bed_number) === i);
+                const occupants = displayRecords.filter(r => parseInt(r.bed_number) === i);
                 if (occupants.length === 0) {
                     grid.innerHTML += `<div onclick="handleVacantClick(${i})" class="bed-card vacant group"><span class="text-3xl font-bold text-slate-300 group-hover:text-medical-400">${i}</span><span class="text-[10px] font-bold text-slate-300 uppercase mt-1 group-hover:text-medical-500">Vacant</span></div>`;
                 } else {
@@ -435,15 +451,15 @@
         function renderMatrix() { 
             const container = document.getElementById('matrixContainer'); 
             container.innerHTML = ""; 
-            const activeRecords = records.filter(r => r.ward === currentWard && !r.is_discharged); 
+            const displayRecords = ROLE === 'chief' ? records.filter(r => !r.is_discharged) : records.filter(r => r.ward === currentWard && !r.is_discharged);
             const usedUnits = new Set(); 
-            activeRecords.forEach(r => r.consult_units.forEach(u => usedUnits.add(u.id))); 
+            displayRecords.forEach(r => r.consult_units.forEach(u => usedUnits.add(u.id))); 
             const sortedUnits = Array.from(usedUnits).sort(); 
             
             if(sortedUnits.length === 0) { container.innerHTML = "<div class='p-10 text-slate-400 italic'>No active consultations.</div>"; return; } 
             
             sortedUnits.forEach(unit => { 
-                const patients = activeRecords.filter(r => r.consult_units.some(u => u.id === unit)); 
+                const patients = displayRecords.filter(r => r.consult_units.some(u => u.id === unit)); 
                 let html = `<div class="matrix-col snap-center shrink-0"><h4 class="font-bold text-sm text-slate-700 uppercase mb-3 flex items-center gap-2"><i class="fa-solid fa-user-md text-medical-500"></i> ${unit} <span class="bg-slate-200 text-slate-600 px-1.5 rounded-md text-[10px]">${patients.length}</span></h4><div class="space-y-2">`; 
                 patients.forEach(r => { 
                     const isSelected = selectedIds.has(r.id);
@@ -459,7 +475,8 @@
 
         function renderHandoff() {
             const container = document.getElementById('handoffContent');
-            const activeRecords = records.filter(r => r.ward === currentWard && !r.is_discharged).sort((a,b) => parseInt(a.bed_number) - parseInt(b.bed_number));
+            const displayRecords = ROLE === 'chief' ? records.filter(r => !r.is_discharged) : records.filter(r => r.ward === currentWard && !r.is_discharged);
+            const activeRecords = displayRecords.sort((a,b) => parseInt(a.bed_number) - parseInt(b.bed_number));
             if(activeRecords.length === 0) { container.innerHTML = "No patients."; return; }
 
             let html = `
@@ -546,9 +563,11 @@
                 const r = records.find(x => x.id === id); originalOwner = r.owner;
                 if(ROLE === 'chief') { 
                     const resSel = document.getElementById('residentSelect'); document.getElementById('residentSelectorDiv').classList.remove('hidden'); 
+                    // Add current owner to options if needed
                     let opts = availableResidents.map(r => `<option value="${r}">${r}</option>`);
-                    if (originalOwner && !availableResidents.includes(originalOwner)) opts.unshift(`<option value="${originalOwner}">${originalOwner} (Current)</option>`);
-                    resSel.innerHTML = opts.join(''); resSel.value = originalOwner;
+                    if(originalOwner && !availableResidents.includes(originalOwner)) opts.unshift(`<option value="${originalOwner}">${originalOwner}</option>`);
+                    resSel.innerHTML = opts.join('');
+                    resSel.value = originalOwner;
                 }
                 document.getElementById('editorTitle').innerText = "Edit Patient"; document.getElementById('editBed').value = r.bed_number; document.getElementById('editorBedBadge').innerText = `#${r.bed_number}`;
                 document.getElementById('editHN').value = r.hn; document.getElementById('editName').value = r.name; setDetails(r.details);
@@ -557,9 +576,8 @@
             } else {
                 if(ROLE === 'chief') { 
                     const resSel = document.getElementById('residentSelect'); document.getElementById('residentSelectorDiv').classList.remove('hidden'); 
-                    // Populate from available, default to currently selected if possible
-                    resSel.innerHTML = availableResidents.map(r => `<option value="${r}" ${r===chiefSelectedDB?'selected':''}>${r}</option>`).join('');
-                    originalOwner = resSel.value;
+                    resSel.innerHTML = availableResidents.map(r => `<option value="${r}">${r}</option>`).join('');
+                    if(availableResidents.length > 0) originalOwner = availableResidents[0];
                 }
                 document.getElementById('editorTitle').innerText = "Admit Patient"; document.getElementById('editBed').value = bedNum || 1; document.getElementById('editorBedBadge').innerText = `#${bedNum||1}`;
                 document.getElementById('editHN').value = ""; document.getElementById('editName').value = ""; setDetails(""); setActiveColor('#ffffff'); toggleElement('btnDelete', false);
@@ -619,23 +637,18 @@
             
             let name = targetName; if(!name) { const count = records.length + 1; name = `Patient_${String(count).padStart(3, '0')}`; }
             
-            // Current State from Editor
-            const currentRecord = records.find(r => r.id === editingId);
-            const clientLastUpdated = currentRecord ? currentRecord.updated_at : null;
-
             const p = { 
                 id: editingId || 'rec_' + Date.now(), 
                 bed_number: targetBed, hn: document.getElementById('editHN').value, name: name, ward: currentWard, 
                 details: detailsVal, consult_units: JSON.stringify(activeConsults), 
                 color_id: document.getElementById('colorContainer').dataset.selected || '#ffffff', 
                 todo_list: JSON.stringify(validTodos), is_discharged: currentDischarged,
-                last_updated_client: clientLastUpdated // Protocol C: Send timestamp
+                last_updated_client: records.find(r => r.id === editingId)?.updated_at || null 
             };
 
             let targetDB = DB_NAME;
             if (ROLE === 'chief') { 
-                // Ensure we save to the currently selected Chief View DB or the Resident selector in modal
-                targetDB = document.getElementById('residentSelect').value || chiefSelectedDB; 
+                targetDB = document.getElementById('residentSelect').value; 
                 if(!targetDB) { alert("Please select a resident."); return; } 
             }
             
@@ -652,15 +665,12 @@
             const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(payload) });
             const json = await res.json();
 
-            // --- PROTOCOL C: HANDLING CONFLICTS ---
             if (json.status === 'conflict') {
-                if(confirm(`DATA CONFLICT!\n\nThe server has newer data for this patient.\nYour changes: ${p.details.substring(0,20)}...\nServer data: ${json.serverData.details.substring(0,20)}...\n\nClick OK to OVERWRITE server (force save).\nClick Cancel to DISCARD your changes and reload.`)) {
-                     // Force Save
+                if(confirm(`DATA CONFLICT!\n\nServer has newer data.\nOverwrite?`)) {
                      payload.force = true;
                      await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
                      showToast("Forced Update Success", true);
                 } else {
-                    // Discard and Reload
                     fetchData();
                     alert("Reloaded latest data.");
                 }
