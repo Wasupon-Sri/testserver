@@ -32,25 +32,29 @@
         .bed-card.vacant:hover { opacity: 1; border-color: #94a3b8; background: #e2e8f0; cursor: pointer; }
         .fs-mode { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; z-index: 9999 !important; width: 100vw !important; height: 100vh !important; background-color: #e2e8f0 !important; display: flex; justify-content: center; align-items: center; }
         .fs-paper { width: 60%; height: 90%; background: white; box-shadow: 0 10px 50px rgba(0,0,0,0.3); padding: 60px; font-size: 16pt; line-height: 1.6; outline: none; resize: none; overflow-y: auto; color: #1e293b; border-radius: 4px; }
-        .consult-chip { padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; transition: all 0.2s; cursor: pointer; }
+        .consult-chip { padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; transition: all 0.2s; }
         .consult-chip.active { background-color: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
         .consult-chip.inactive { background-color: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; opacity: 0.7; }
-        .color-dot { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .color-dot { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s; }
         .color-dot.selected { border-color: #334155; transform: scale(1.1); box-shadow: 0 0 0 2px #cbd5e1; }
         .matrix-col { min-width: 250px; background: #f8fafc; border-radius: 12px; padding: 12px; border: 1px solid #e2e8f0; }
         .grid-1 { grid-template-columns: repeat(1, 1fr); } .grid-2 { grid-template-columns: repeat(2, 1fr); } .grid-3 { grid-template-columns: repeat(3, 1fr); } .grid-4 { grid-template-columns: repeat(4, 1fr); } .grid-5 { grid-template-columns: repeat(5, 1fr); } .grid-6 { grid-template-columns: repeat(6, 1fr); }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e2e8f0; border-radius: 20px; }
         
-        /* Force Black Cursor & Caret for better visibility */
+        /* FIX: Black Cursor for Light App Background (High Contrast) */
         input, textarea, [contenteditable="true"] {
             caret-color: black !important;
-            cursor: text !important;
+            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' stroke='black' stroke-width='3' stroke-linecap='round'><path d='M16 4v24M11 4h10M11 28h10'/></svg>") 16 16, text !important;
         }
-        
+
+        @keyframes spin-forced { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spin-active { animation: spin-forced 1s linear infinite; }
+
         @media print {
-            body { background: white; }
-            #appContainer { display: none; }
-            #handoffContainer { display: block !important; }
+            body * { visibility: hidden; }
+            #printContainer, #printContainer * { visibility: visible; }
+            #printContainer { position: absolute; left: 0; top: 0; width: 100%; display: block !important; background: white; }
+            #appContainer { display: none !important; }
         }
     </style>
 </head>
@@ -59,6 +63,8 @@
     <div id="saveToast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-[10001] px-6 py-3 rounded-full text-white font-bold shadow-2xl transition-all duration-300 opacity-0 translate-y-10 flex items-center gap-3 bg-slate-900 pointer-events-none">
         <i class="fa-solid fa-floppy-disk"></i> <span id="saveToastMsg">Saving...</span>
     </div>
+    
+    <div id="printContainer" class="hidden bg-white p-10"></div>
 
     <!-- AUTH OVERLAY -->
     <div id="authOverlay" class="fixed inset-0 z-50 bg-slate-50 flex items-center justify-center p-6">
@@ -77,7 +83,7 @@
                 <input type="password" id="setupPin" placeholder="Create Password" class="w-full p-3 text-center text-lg font-bold rounded-xl border border-slate-200 bg-white">
                 <button onclick="setupPassword()" class="w-full py-3 bg-medical-600 text-white font-bold rounded-xl shadow-lg">Set Password</button>
             </div>
-            <div id="loadingState" class="mt-4"><i class="fa-solid fa-circle-notch fa-spin text-medical-500 text-2xl"></i></div>
+            <div id="loadingState" class="mt-4"><i class="fa-solid fa-circle-notch spin-active text-medical-500 text-2xl"></i></div>
         </div>
     </div>
 
@@ -89,6 +95,16 @@
                 <div class="leading-tight">
                     <h2 class="font-bold text-lg text-slate-800" id="headerWard">General Ward</h2>
                     <span id="roleBadge" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resident View</span>
+                </div>
+                
+                <!-- NEW: CHIEF SOURCE SELECTOR -->
+                <div id="chiefSourceSelector" class="hidden ml-2">
+                    <div class="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1">
+                        <i class="fa-solid fa-database text-orange-500 text-xs"></i>
+                        <select id="dbSelector" onchange="switchDatabase(this.value)" class="bg-transparent text-xs font-bold text-orange-700 outline-none cursor-pointer min-w-[120px]">
+                            <option value="">Select Source...</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -104,12 +120,6 @@
                  <button onclick="manualRefresh()" id="btnRefresh" class="w-10 h-10 rounded-lg bg-slate-800 text-white flex items-center justify-center shadow-md hover:bg-slate-700"><i class="fa-solid fa-rotate"></i></button>
             </div>
         </header>
-        
-        <!-- Chief Loading Progress Bar -->
-        <div id="batchLoader" class="hidden bg-medical-50 text-medical-700 px-4 py-2 text-xs font-bold border-b border-medical-100 flex justify-between items-center">
-            <span id="batchStatus">Loading Residents...</span>
-            <div class="w-32 bg-medical-200 rounded-full h-1.5"><div id="batchProgress" class="bg-medical-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div></div>
-        </div>
 
         <div id="selectionToolbar" class="hidden bg-slate-800 text-white px-4 py-2 flex justify-between items-center shadow-lg z-30">
             <span class="text-xs font-bold"><span id="selectCount">0</span> selected</span>
@@ -135,8 +145,16 @@
         </div>
 
         <main class="flex-1 overflow-y-auto p-4 md:p-6 relative" id="mainScroll">
+            <!-- EMPTY STATE FOR CHIEF -->
+            <div id="chiefEmptyState" class="hidden h-full flex flex-col items-center justify-center text-slate-400 pb-20">
+                <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><i class="fa-solid fa-arrow-up text-2xl text-slate-300"></i></div>
+                <p class="font-bold">Select a Ward Source above</p>
+                <p class="text-xs mt-1">To view patient data, select a resident database.</p>
+            </div>
+
             <div id="viewGrid" class="block"><div id="bedGrid" class="grid gap-3 pb-20 transition-all duration-300"></div></div>
             <div id="viewMatrix" class="hidden pb-20"><div id="matrixContainer" class="flex gap-4 overflow-x-auto pb-6 snap-x"></div></div>
+            
             <div id="viewHandoff" class="hidden pb-20 max-w-4xl mx-auto">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-lg font-bold text-slate-800">Sign-Out / Handoff Sheet</h3>
@@ -144,30 +162,10 @@
                 </div>
                 <div id="handoffContent" class="bg-white p-8 shadow-sm border border-slate-200 rounded-xl font-mono text-xs"></div>
             </div>
+            
             <div id="viewDischarged" class="hidden pb-20"><h3 class="text-lg font-bold text-slate-600 mb-4 flex items-center gap-2"><i class="fa-solid fa-box-archive"></i> Archived Patients</h3><div id="dischargedList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div></div>
         </main>
         <button onclick="openEditor(null)" class="fixed bottom-6 right-6 w-14 h-14 bg-slate-800 text-white rounded-full shadow-2xl flex items-center justify-center z-30 hover:scale-105 transition hover:bg-medical-600"><i class="fa-solid fa-plus text-xl"></i></button>
-    </div>
-
-    <!-- SETTINGS MODAL -->
-    <div id="settingsModal" class="fixed inset-0 z-[70] hidden flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl w-96 p-6 shadow-2xl animate-fade-in relative">
-            <button onclick="toggleElement('settingsModal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
-            <h3 class="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><i class="fa-solid fa-user-gear"></i> Profile Settings</h3>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">New Password</label>
-                    <input type="password" id="setNewPwd" placeholder="Leave empty to keep current" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-medical-500">
-                </div>
-                <div id="usernameChangeSection">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Username (Database Name)</label>
-                    <input type="text" id="setNewName" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-medical-500 font-bold">
-                    <p class="text-[10px] text-orange-500 mt-1"><i class="fa-solid fa-circle-exclamation"></i> Changing this will rename your database.</p>
-                </div>
-                <button onclick="updateProfile()" id="btnUpdateProfile" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-4 shadow-lg hover:bg-slate-700">Update Profile</button>
-            </div>
-        </div>
     </div>
 
     <div id="editorModal" class="fixed inset-0 z-50 hidden">
@@ -251,12 +249,19 @@
         let isSelectMode = false; let selectedIds = new Set();
         let autoSaveTimer = null; let refreshTimer = null;
         let toastTimer = null; 
+        
+        // NEW: Chief State
+        let chiefSelectedDB = ""; 
 
         window.onload = () => {
             if(!DB_NAME) return document.body.innerHTML = "<div class='p-10 text-center font-bold'>Error: No Database Selected</div>";
             document.getElementById('loginDbName').innerText = DB_NAME;
-            document.getElementById('roleBadge').innerText = ROLE === 'chief' ? "Ward Chief (Aggregated)" : "Ward Resident";
-            if(ROLE === 'chief') document.getElementById('roleBadge').className = "text-[10px] font-bold text-orange-500 uppercase tracking-wider";
+            document.getElementById('roleBadge').innerText = ROLE === 'chief' ? "Ward Chief" : "Ward Resident";
+            if(ROLE === 'chief') {
+                document.getElementById('roleBadge').className = "text-[10px] font-bold text-orange-500 uppercase tracking-wider";
+                document.getElementById('viewBtnHandoff').style.display = 'none'; // Hide Handoff for Chief
+                document.getElementById('chiefSourceSelector').classList.remove('hidden'); // Show Dropdown
+            }
             const savedGrid = localStorage.getItem('ward_grid_cols'); if(savedGrid) gridCols = parseInt(savedGrid);
             const savedBeds = localStorage.getItem('ward_total_beds'); if(savedBeds) { totalBeds = parseInt(savedBeds); document.getElementById('bedCountSlider').value = totalBeds; document.getElementById('bedCountLabel').innerText = totalBeds; }
             checkAuth(); renderColorPicker();
@@ -280,7 +285,7 @@
                     document.getElementById('authOverlay').classList.add('hidden');
                     document.getElementById('appContainer').classList.remove('hidden');
                     await fetchData();
-                    changeWard(); 
+                    if (ROLE !== 'chief') changeWard(); 
                     startAutomation();
                 } else { alert("Incorrect Password"); }
             } catch(e) { alert("Login Error: " + e.message); } finally { btn.innerText = "Login"; }
@@ -294,53 +299,66 @@
             autoSaveTimer = setInterval(() => { if(!document.getElementById('editorModal').classList.contains('hidden')) saveRecord(true); }, 30000);
         }
 
+        // NEW: Specific DB Switching for Chiefs
+        function switchDatabase(db) {
+            chiefSelectedDB = db;
+            records = []; // Clear current view
+            renderView(); // Clear grid
+            if(db) {
+                document.getElementById('chiefEmptyState').classList.add('hidden');
+                fetchData(); 
+            } else {
+                document.getElementById('chiefEmptyState').classList.remove('hidden');
+            }
+        }
+
         async function fetchData(silent = false) {
-            if(!silent) document.getElementById('btnRefresh').classList.add('animate-spin');
+            if(!silent) document.getElementById('btnRefresh').classList.add('animate-spin', 'spin-active');
+            
             try {
+                // --- TARGETED FETCH FOR CHIEF ---
                 if (ROLE === 'chief') {
-                    // --- PROTOCOL B: BATCH LOADER ---
+                    // 1. Load User List (only once ideally, but cheap enough to reload)
                     const listRes = await fetch(`${API_URL}?action=admin_list_users`);
                     const listJson = await listRes.json();
+                    
+                    // Update Dropdown
+                    const sel = document.getElementById('dbSelector');
+                    const currentSel = sel.value;
                     availableResidents = listJson.users.filter(u => u.role === 'resident').map(u => u.name);
                     
-                    const residentUsers = listJson.users.filter(u => u.role === 'resident');
-                    const BATCH_SIZE = 3; 
-                    const allResults = [];
-                    const batchBar = document.getElementById('batchLoader');
-                    const batchProg = document.getElementById('batchProgress');
-                    const batchStatus = document.getElementById('batchStatus');
-
-                    if(!silent) batchBar.classList.remove('hidden');
-
-                    for (let i = 0; i < residentUsers.length; i += BATCH_SIZE) {
-                        const batch = residentUsers.slice(i, i + BATCH_SIZE);
-                        if(!silent) {
-                            batchStatus.innerText = `Loading ${i+1}-${Math.min(i+BATCH_SIZE, residentUsers.length)} of ${residentUsers.length}...`;
-                            batchProg.style.width = `${Math.round((i / residentUsers.length) * 100)}%`;
-                        }
-
-                        const promises = batch.map(u => fetch(API_URL, { 
+                    sel.innerHTML = `<option value="">Select Source...</option>` + 
+                        availableResidents.map(r => `<option value="${r}" ${r===chiefSelectedDB?'selected':''}>${r}</option>`).join('');
+                    
+                    if (chiefSelectedDB) {
+                        sel.value = chiefSelectedDB; // Preserve selection
+                        // 2. Fetch DATA only for selected DB
+                        const res = await fetch(API_URL, { 
                             method: 'POST', 
                             headers: {"Content-Type": "text/plain;charset=utf-8"}, 
-                            body: JSON.stringify({ action: 'read', db: u.name, password: PASSWORD, requester: DB_NAME }) 
-                        }).then(r => r.json()).then(data => Array.isArray(data) ? data.map(rec => ({...processRecord(rec), owner: u.name})) : []).catch(() => []));
-                        
-                        const batchResults = await Promise.all(promises);
-                        allResults.push(...batchResults.flat());
+                            body: JSON.stringify({ action: 'read', db: chiefSelectedDB, password: PASSWORD, requester: DB_NAME }) 
+                        });
+                        const json = await res.json();
+                        records = Array.isArray(json) ? json.map(rec => ({...processRecord(rec), owner: chiefSelectedDB})) : [];
+                        document.getElementById('chiefEmptyState').classList.add('hidden');
+                    } else {
+                        // No DB selected yet
+                        records = [];
+                        document.getElementById('chiefEmptyState').classList.remove('hidden');
                     }
-                    records = allResults;
-                    if(!silent) batchBar.classList.add('hidden');
-
-                } else {
+                } 
+                // --- NORMAL FETCH FOR RESIDENT ---
+                else {
                     const res = await fetch(API_URL, { method: 'POST', headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify({action: 'read', db: DB_NAME, password: PASSWORD}) });
                     const json = await res.json();
                     if(json.error) throw new Error(json.error);
                     records = Array.isArray(json) ? json.map(processRecord) : [];
                 }
             } catch(e) { if(!silent) console.error("Fetch Error:", e); }
+            
             wards = new Set(["General Ward"]); records.forEach(r => { if(r.ward) wards.add(r.ward); });
             renderView();
-            if(!silent) document.getElementById('btnRefresh').classList.remove('animate-spin');
+            if(!silent) document.getElementById('btnRefresh').classList.remove('animate-spin', 'spin-active');
         }
 
         function processRecord(r) {
@@ -364,13 +382,19 @@
             renderView();
         }
         function renderView() { 
+            // Safety: If Chief has not selected a DB, don't render grid to avoid confusion
+            if(ROLE === 'chief' && !chiefSelectedDB) {
+                document.getElementById('bedGrid').innerHTML = "";
+                document.getElementById('matrixContainer').innerHTML = "";
+                return;
+            }
+
             if(!document.getElementById('viewGrid').classList.contains('hidden')) renderGrid();
             else if(!document.getElementById('viewMatrix').classList.contains('hidden')) renderMatrix();
             else if(!document.getElementById('viewHandoff').classList.contains('hidden')) renderHandoff();
             else if(!document.getElementById('viewDischarged').classList.contains('hidden')) renderDischarged();
         }
 
-        // --- GRID & MATRIX RENDERERS (UNCHANGED CORE LOGIC, UPDATED STYLES) ---
         function toggleGridMenu() { document.getElementById('gridMenu').classList.toggle('hidden'); }
         function setGrid(cols) { gridCols = cols; localStorage.setItem('ward_grid_cols', cols); renderGrid(); toggleGridMenu(); }
         function updateBedCount(val) { totalBeds = parseInt(val); document.getElementById('bedCountLabel').innerText = val; localStorage.setItem('ward_total_beds', val); renderGrid(); }
@@ -433,7 +457,6 @@
             }); 
         }
 
-        // --- NEW: HANDOFF VIEW (PROTOCOL D) ---
         function renderHandoff() {
             const container = document.getElementById('handoffContent');
             const activeRecords = records.filter(r => r.ward === currentWard && !r.is_discharged).sort((a,b) => parseInt(a.bed_number) - parseInt(b.bed_number));
@@ -462,7 +485,10 @@
             container.innerHTML = html;
         }
 
-        function printHandoff() { window.print(); }
+        function printHandoff() { 
+            document.getElementById('printContainer').innerHTML = document.getElementById('handoffContent').innerHTML;
+            window.print(); 
+        }
 
         function renderDischarged() {
             const list = document.getElementById('dischargedList'); list.innerHTML = "";
@@ -484,7 +510,6 @@
             });
         }
 
-        // --- EDITOR & ACTIONS ---
         function toggleSelectMode() { 
             isSelectMode = !isSelectMode; if(!isSelectMode) selectedIds.clear(); 
             document.getElementById('selectionToolbar').classList.toggle('hidden', !isSelectMode); 
@@ -532,7 +557,9 @@
             } else {
                 if(ROLE === 'chief') { 
                     const resSel = document.getElementById('residentSelect'); document.getElementById('residentSelectorDiv').classList.remove('hidden'); 
-                    resSel.innerHTML = availableResidents.map(r => `<option value="${r}">${r}</option>`).join(''); originalOwner = resSel.value;
+                    // Populate from available, default to currently selected if possible
+                    resSel.innerHTML = availableResidents.map(r => `<option value="${r}" ${r===chiefSelectedDB?'selected':''}>${r}</option>`).join('');
+                    originalOwner = resSel.value;
                 }
                 document.getElementById('editorTitle').innerText = "Admit Patient"; document.getElementById('editBed').value = bedNum || 1; document.getElementById('editorBedBadge').innerText = `#${bedNum||1}`;
                 document.getElementById('editHN').value = ""; document.getElementById('editName').value = ""; setDetails(""); setActiveColor('#ffffff'); toggleElement('btnDelete', false);
@@ -555,50 +582,6 @@
         function renderColorPicker() { document.getElementById('colorContainer').innerHTML = COLORS.map(c => `<div class="color-dot bg-[${c}] shadow-sm" style="background-color: ${c}" onclick="setActiveColor('${c}')" data-col="${c}"></div>`).join(''); }
         function setActiveColor(c) { document.querySelectorAll('.color-dot').forEach(el => el.classList.toggle('selected', el.dataset.col === c)); document.getElementById('colorContainer').dataset.selected = c; }
         
-        // --- SETTINGS & PROFILE (NEW) ---
-        function openSettings() {
-            document.getElementById('setNewName').value = DB_NAME;
-            document.getElementById('setNewPwd').value = "";
-            toggleElement('settingsModal', true);
-            // Chiefs cannot rename themselves easily without breaking links for everyone else, so maybe hide renaming for Chiefs or warn heavily
-            if (ROLE === 'chief') {
-               document.getElementById('usernameChangeSection').classList.add('opacity-50', 'pointer-events-none');
-            }
-        }
-        
-        async function updateProfile() {
-            const newPwd = document.getElementById('setNewPwd').value;
-            const newName = document.getElementById('setNewName').value.trim();
-            
-            if(!newName) return alert("Username cannot be empty");
-            if(newName !== DB_NAME && !confirm("WARNING: Changing your username will rename your database. You will need to use the NEW name to login next time. Continue?")) return;
-            
-            const btn = document.getElementById('btnUpdateProfile');
-            btn.innerText = "Updating..."; btn.disabled = true;
-
-            try {
-                const res = await fetch(API_URL, { 
-                    method: 'POST', 
-                    body: JSON.stringify({
-                        action: 'auth_update_profile', 
-                        db: DB_NAME, 
-                        password: PASSWORD,
-                        newPassword: newPwd,
-                        newDbName: newName
-                    }) 
-                });
-                const json = await res.json();
-                
-                if (json.status === 'success' || json.status === 'renamed') {
-                    alert("Profile Updated. Please login again.");
-                    window.location.href = "index.html"; // Return to portal
-                } else {
-                    alert(json.error || "Update Failed");
-                }
-            } catch(e) { alert("Network Error"); }
-            finally { btn.innerText = "Update Profile"; btn.disabled = false; }
-        }
-
         // --- CORE ACTIONS ---
         function changeWard() {
             toggleElement('wardModal', true);
@@ -650,12 +633,15 @@
             };
 
             let targetDB = DB_NAME;
-            if (ROLE === 'chief') { targetDB = document.getElementById('residentSelect').value; if(!targetDB) { alert("Please select a resident."); return; } }
+            if (ROLE === 'chief') { 
+                // Ensure we save to the currently selected Chief View DB or the Resident selector in modal
+                targetDB = document.getElementById('residentSelect').value || chiefSelectedDB; 
+                if(!targetDB) { alert("Please select a resident."); return; } 
+            }
             
             const payload = { action: 'save', db: targetDB, requester: DB_NAME, password: PASSWORD, ...p };
             
             if (ROLE !== 'chief') { 
-                // Optimistic UI Update (for Residents only)
                 const clean = {...p, consult_units: activeConsults, todo_list: validTodos}; 
                 const idx = records.findIndex(r => r.id === p.id); 
                 if(idx > -1) records[idx] = clean; else records.push(clean); 
@@ -681,7 +667,6 @@
             } else if (json.status === 'success') {
                 if (ROLE === 'chief') fetchData(true);
                 else {
-                     // Update timestamp with real server time
                      const idx = records.findIndex(r => r.id === p.id); 
                      if(idx > -1) records[idx].updated_at = json.updated_at;
                 }
